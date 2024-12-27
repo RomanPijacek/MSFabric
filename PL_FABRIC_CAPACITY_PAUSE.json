@@ -1,0 +1,207 @@
+{
+	"name": "PL_FABRIC_CAPACITY_PAUSE",
+	"properties": {
+		"activities": [
+			{
+				"name": "Get State of Fabric Capacity",
+				"type": "WebActivity",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.00:10:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 60,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"method": "GET",
+					"url": {
+						"value": "@concat(\n    'https://management.azure.com/subscriptions/',\n    pipeline().parameters.PAR_PL_Subscription_Id,\n    '/resourceGroups/',\n    pipeline().parameters.PAR_PL_Resource_Group_Name,\n    '/providers/Microsoft.Fabric/capacities/',\n    pipeline().parameters.PAR_PL_Fabric_Capacity_Name,\n    '?api-version=2022-07-01-preview'\n)",
+						"type": "Expression"
+					},
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://management.azure.com"
+					}
+				}
+			},
+			{
+				"name": "Is Fabric Capacity Active",
+				"type": "IfCondition",
+				"dependsOn": [
+					{
+						"activity": "Get State of Fabric Capacity",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"expression": {
+						"value": "@equals(activity('Get State of Fabric Capacity').output.properties.state,'Active')",
+						"type": "Expression"
+					},
+					"ifFalseActivities": [
+						{
+							"name": "Skip",
+							"type": "Wait",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"waitTimeInSeconds": 1
+							}
+						}
+					],
+					"ifTrueActivities": [
+						{
+							"name": "Pause Fabric Capacity",
+							"type": "WebActivity",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.00:10:00",
+								"retry": 2,
+								"retryIntervalInSeconds": 60,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"method": "POST",
+								"httpRequestTimeout": "00:10:00",
+								"url": {
+									"value": "@concat(\n    'https://management.azure.com/subscriptions/',\n    pipeline().parameters.PAR_PL_Subscription_Id,\n    '/resourceGroups/',\n    pipeline().parameters.PAR_PL_Resource_Group_Name,\n    '/providers/Microsoft.Fabric/capacities/',\n    pipeline().parameters.PAR_PL_Fabric_Capacity_Name,\n    '/suspend?api-version=2022-07-01-preview'\n)",
+									"type": "Expression"
+								},
+								"body": "\"action\": \"pause\"",
+								"authentication": {
+									"type": "MSI",
+									"resource": "https://management.azure.com"
+								}
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "Wait Until Paused",
+				"type": "Until",
+				"dependsOn": [
+					{
+						"activity": "Is Fabric Capacity Active",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"expression": {
+						"value": "@variables('v_is_capacity_paused')",
+						"type": "Expression"
+					},
+					"activities": [
+						{
+							"name": "Check Fabric Capacity State",
+							"type": "WebActivity",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.00:10:00",
+								"retry": 2,
+								"retryIntervalInSeconds": 60,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"method": "GET",
+								"url": {
+									"value": "@concat(\n    'https://management.azure.com/subscriptions/',\n    pipeline().parameters.PAR_PL_Subscription_Id,\n    '/resourceGroups/',\n    pipeline().parameters.PAR_PL_Resource_Group_Name,\n    '/providers/Microsoft.Fabric/capacities/',\n    pipeline().parameters.PAR_PL_Fabric_Capacity_Name,\n    '?api-version=2022-07-01-preview'\n)",
+									"type": "Expression"
+								},
+								"authentication": {
+									"type": "MSI",
+									"resource": "https://management.azure.com"
+								}
+							}
+						},
+						{
+							"name": "Check if Capacity Paused",
+							"type": "IfCondition",
+							"dependsOn": [
+								{
+									"activity": "Check Fabric Capacity State",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"expression": {
+									"value": "@equals(activity('Check Fabric Capacity State').output.properties.state,'Paused')",
+									"type": "Expression"
+								},
+								"ifFalseActivities": [
+									{
+										"name": "Wait for next check",
+										"type": "Wait",
+										"dependsOn": [],
+										"userProperties": [],
+										"typeProperties": {
+											"waitTimeInSeconds": 60
+										}
+									}
+								],
+								"ifTrueActivities": [
+									{
+										"name": "v_is_capacity_paused",
+										"type": "SetVariable",
+										"dependsOn": [],
+										"policy": {
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"variableName": "v_is_capacity_paused",
+											"value": {
+												"value": "@bool(true)",
+												"type": "Expression"
+											}
+										}
+									}
+								]
+							}
+						}
+					],
+					"timeout": "0.00:10:00"
+				}
+			}
+		],
+		"parameters": {
+			"PAR_PL_Subscription_Id": {
+				"type": "string",
+				"defaultValue": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+			},
+			"PAR_PL_Resource_Group_Name": {
+				"type": "string",
+				"defaultValue": "RG_NAME"
+			},
+			"PAR_PL_Fabric_Capacity_Name": {
+				"type": "string",
+				"defaultValue": "MyFabricCapacityName"
+			}
+		},
+		"variables": {
+			"v_is_capacity_paused": {
+				"type": "Boolean"
+			}
+		},
+		"folder": {
+			"name": "_Admin"
+		},
+		"annotations": []
+	}
+}

@@ -1,0 +1,49 @@
+{
+	"name": "PL_FABRIC_CAPACITY_GET_STATE",
+	"properties": {
+		"activities": [
+			{
+				"name": "Get State of Fabric Capacity",
+				"type": "WebActivity",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.00:10:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 60,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"method": "GET",
+					"url": {
+						"value": "@concat(\n    'https://management.azure.com/subscriptions/',\n    pipeline().parameters.PAR_PL_Subscription_Id,\n    '/resourceGroups/',\n    pipeline().parameters.PAR_PL_Resource_Group_Name,\n    '/providers/Microsoft.Fabric/capacities/',\n    pipeline().parameters.PAR_PL_Fabric_Capacity_Name,\n    '?api-version=2022-07-01-preview'\n)",
+						"type": "Expression"
+					},
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://management.azure.com"
+					}
+				}
+			}
+		],
+		"parameters": {
+			"PAR_PL_Subscription_Id": {
+				"type": "string",
+				"defaultValue": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+			},
+			"PAR_PL_Resource_Group_Name": {
+				"type": "string",
+				"defaultValue": "RG_NAME"
+			},
+			"PAR_PL_Fabric_Capacity_Name": {
+				"type": "string",
+				"defaultValue": "MyFabricCapacityName"
+			}
+		},
+		"folder": {
+			"name": "_Admin"
+		},
+		"annotations": []
+	}
+}

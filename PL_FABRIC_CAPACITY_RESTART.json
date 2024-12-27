@@ -1,0 +1,92 @@
+{
+	"name": "PL_FABRIC_CAPACITY_RESTART",
+	"properties": {
+		"activities": [
+			{
+				"name": "Pause Fabric Capacity",
+				"type": "ExecutePipeline",
+				"dependsOn": [],
+				"policy": {
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "PL_FABRIC_CAPACITY_PAUSE",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true,
+					"parameters": {
+						"PAR_PL_Subscription_Id": {
+							"value": "@pipeline().parameters.PAR_PL_Subscription_Id",
+							"type": "Expression"
+						},
+						"PAR_PL_Resource_Group_Name": {
+							"value": "@pipeline().parameters.PAR_PL_Resource_Group_Name",
+							"type": "Expression"
+						},
+						"PAR_PL_Fabric_Capacity_Name": {
+							"value": "@pipeline().parameters.PAR_PL_Fabric_Capacity_Name",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "Resume Fabric Capacity",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "Pause Fabric Capacity",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "PL_FABRIC_CAPACITY_RESUME",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true,
+					"parameters": {
+						"PAR_PL_Subscription_Id": {
+							"value": "@pipeline().parameters.PAR_PL_Subscription_Id",
+							"type": "Expression"
+						},
+						"PAR_PL_Resource_Group_Name": {
+							"value": "@pipeline().parameters.PAR_PL_Resource_Group_Name",
+							"type": "Expression"
+						},
+						"PAR_PL_Fabric_Capacity_Name": {
+							"value": "@pipeline().parameters.PAR_PL_Fabric_Capacity_Name",
+							"type": "Expression"
+						}
+					}
+				}
+			}
+		],
+		"parameters": {
+			"PAR_PL_Subscription_Id": {
+				"type": "string",
+				"defaultValue": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+			},
+			"PAR_PL_Resource_Group_Name": {
+				"type": "string",
+				"defaultValue": "RG_NAME"
+			},
+			"PAR_PL_Fabric_Capacity_Name": {
+				"type": "string",
+				"defaultValue": "MyFabricCapacityName"
+			}
+		},
+		"folder": {
+			"name": "_Admin"
+		},
+		"annotations": []
+	}
+}

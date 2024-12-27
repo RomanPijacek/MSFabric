@@ -1,0 +1,258 @@
+{
+	"name": "PL_FABRIC_CAPACITY_SET_SKU",
+	"properties": {
+		"activities": [
+			{
+				"name": "Is Fabric Capacity Active",
+				"type": "IfCondition",
+				"dependsOn": [
+					{
+						"activity": "Get State of Fabric Capacity",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"expression": {
+						"value": "@equals(activity('Get State of Fabric Capacity').output.properties.state, 'Active')",
+						"type": "Expression"
+					},
+					"ifFalseActivities": [
+						{
+							"name": "Fail",
+							"description": "Fail Capacity Scaling as Capacity is not in Active State",
+							"type": "Fail",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"message": "Capacity is not in Active State",
+								"errorCode": "409"
+							}
+						}
+					],
+					"ifTrueActivities": [
+						{
+							"name": "Continue",
+							"type": "Wait",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"waitTimeInSeconds": 1
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "Wait Until Capacity SKU Updated",
+				"type": "Until",
+				"dependsOn": [
+					{
+						"activity": "Is Fabric Capacity Update Required",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"expression": {
+						"value": "@variables('v_is_capacity_updated')",
+						"type": "Expression"
+					},
+					"activities": [
+						{
+							"name": "Check Fabric Capacity State",
+							"type": "WebActivity",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.00:10:00",
+								"retry": 2,
+								"retryIntervalInSeconds": 60,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"method": "GET",
+								"url": {
+									"value": "@concat(\n    'https://management.azure.com/subscriptions/',\n    pipeline().parameters.PAR_PL_Subscription_Id,\n    '/resourceGroups/',\n    pipeline().parameters.PAR_PL_Resource_Group_Name,\n    '/providers/Microsoft.Fabric/capacities/',\n    pipeline().parameters.PAR_PL_Fabric_Capacity_Name,\n    '?api-version=2022-07-01-preview'\n)",
+									"type": "Expression"
+								},
+								"authentication": {
+									"type": "MSI",
+									"resource": "https://management.azure.com"
+								}
+							}
+						},
+						{
+							"name": "Check if Capacity Active",
+							"type": "IfCondition",
+							"dependsOn": [
+								{
+									"activity": "Check Fabric Capacity State",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"expression": {
+									"value": "@and(   \n    equals(activity('Check Fabric Capacity State').output.properties.state, 'Active'),\n    equals(activity('Check Fabric Capacity State').output.sku.name, pipeline().parameters.PAR_PL_Fabric_Target_SKU)\n)",
+									"type": "Expression"
+								},
+								"ifFalseActivities": [
+									{
+										"name": "Wait for next check",
+										"type": "Wait",
+										"dependsOn": [],
+										"userProperties": [],
+										"typeProperties": {
+											"waitTimeInSeconds": 60
+										}
+									}
+								],
+								"ifTrueActivities": [
+									{
+										"name": "v_is_capacity_updated",
+										"description": "Set variable to true when capacity is updated to the target SKU and Active",
+										"type": "SetVariable",
+										"dependsOn": [],
+										"policy": {
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"variableName": "v_is_capacity_updated",
+											"value": {
+												"value": "@bool(true)",
+												"type": "Expression"
+											}
+										}
+									}
+								]
+							}
+						}
+					],
+					"timeout": "0.00:20:00"
+				}
+			},
+			{
+				"name": "Is Fabric Capacity Update Required",
+				"type": "IfCondition",
+				"dependsOn": [
+					{
+						"activity": "Is Fabric Capacity Active",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"expression": {
+						"value": "@not(equals(activity('Get State of Fabric Capacity').output.sku.name, pipeline().parameters.PAR_PL_Fabric_Target_SKU))",
+						"type": "Expression"
+					},
+					"ifFalseActivities": [
+						{
+							"name": "Skip",
+							"description": "No Capacity Update required as current SKU is Equal to target SKU",
+							"type": "Wait",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"waitTimeInSeconds": 1
+							}
+						}
+					],
+					"ifTrueActivities": [
+						{
+							"name": "Set Fabric Capacity SKU",
+							"type": "WebActivity",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.00:10:00",
+								"retry": 2,
+								"retryIntervalInSeconds": 60,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"method": "PATCH",
+								"url": {
+									"value": "@concat(\n    'https://management.azure.com/subscriptions/',\n    pipeline().parameters.PAR_PL_Subscription_Id,\n    '/resourceGroups/',\n    pipeline().parameters.PAR_PL_Resource_Group_Name,\n    '/providers/Microsoft.Fabric/capacities/',\n    pipeline().parameters.PAR_PL_Fabric_Capacity_Name,\n    '?api-version=2022-07-01-preview'\n)",
+									"type": "Expression"
+								},
+								"body": {
+									"value": "@json(concat('{\"sku\":{\"name\":\"', pipeline().parameters.PAR_PL_Fabric_Target_SKU, '\",\"tier\":\"Fabric\"}}'))",
+									"type": "Expression"
+								},
+								"authentication": {
+									"type": "MSI",
+									"resource": "https://management.azure.com"
+								}
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "Get State of Fabric Capacity",
+				"type": "WebActivity",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.00:10:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 60,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"method": "GET",
+					"url": {
+						"value": "@concat(\n    'https://management.azure.com/subscriptions/',\n    pipeline().parameters.PAR_PL_Subscription_Id,\n    '/resourceGroups/',\n    pipeline().parameters.PAR_PL_Resource_Group_Name,\n    '/providers/Microsoft.Fabric/capacities/',\n    pipeline().parameters.PAR_PL_Fabric_Capacity_Name,\n    '?api-version=2022-07-01-preview'\n)",
+						"type": "Expression"
+					},
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://management.azure.com"
+					}
+				}
+			}
+		],
+		"parameters": {
+			"PAR_PL_Subscription_Id": {
+				"type": "string",
+				"defaultValue": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+			},
+			"PAR_PL_Resource_Group_Name": {
+				"type": "string",
+				"defaultValue": "RG_NAME"
+			},
+			"PAR_PL_Fabric_Capacity_Name": {
+				"type": "string",
+				"defaultValue": "MyFabricCapacityName"
+			},
+			"PAR_PL_Fabric_Target_SKU": {
+				"type": "string",
+				"defaultValue": "F64"
+			}
+		},
+		"variables": {
+			"v_is_capacity_updated": {
+				"type": "Boolean"
+			}
+		},
+		"folder": {
+			"name": "_Admin"
+		},
+		"annotations": []
+	}
+}
